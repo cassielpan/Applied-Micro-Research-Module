@@ -1,0 +1,1309 @@
+---
+title: "Determinants and Life Course Development of Altruism"
+subtitle: "Research Module in Management and Applied Microeconomics"
+date: "`r format(Sys.Date(), '%d/%m/%y')`"
+output:
+  html_document:
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T)
+library(haven)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(ggpubr)
+library(RColorBrewer)
+library(pander)
+library(tidyr)
+library(stargazer)
+library(sandwich)
+library(AER)
+library(cowplot)
+library(fixest)
+```
+
+```{r echo=T, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+## Edited: Yashaswini (4th Dec 2021)
+
+Paths = c("/Users/yashaswinishekhawat/Documents/Applied-Micro-Dohmen", "/Users/aysuavci/Desktop/Applied_RM/Applied-Micro-Dohmen", "C:/Users/dell/Desktop/Applied-Micro-Dohmen", "C:/Users/Felix/Documents/RM_Dohmen/Applied-Micro-Dohmen",
+"/Users/zixin/Desktop/Applied-Micro-Dohmen")
+names(Paths) = c("yashaswinishekhawat","aysuavci", "dell", "Felix","zixin")
+setwd(Paths[Sys.info()[7]])
+
+
+##### READING IN THE DATA ######
+
+
+#Just in case anyone needs to change something in the way the input/output is specified for their system
+output <- "Outputs/main.csv"
+
+#load the clean data
+dataSOEP <- read.csv(file=output)
+
+###### AGE DUMMIES #####
+## added to setup ##
+# #Creating Age Variable
+# 
+# #harmonize birth year: created var birth_year
+# dataSOEP <- dataSOEP %>%
+#   group_by(pid) %>% 
+#   mutate(birth_year= max(ple0010_h))
+# 
+# dataSOEP <- subset(dataSOEP, dataSOEP$birth_year >0 & dataSOEP$syear >0)
+# 
+# dataSOEP$lifegoal_social_political_active <- dataSOEP$plh0111
+#calculate age according to survey year (age that year)
+dataSOEP_ageclean <- dataSOEP %>% 
+  mutate(age = syear- birth_year,
+         age2 = age^2)
+dataSOEP_ageclean$age_divided <- dataSOEP_ageclean$age/10
+dataSOEP_ageclean$age2_divided <- dataSOEP_ageclean$age2/100
+```
+
+## Summary Statistics of Altruism Scales
+
+## Observations over the years{.tabset}
+```{r}
+#Grouping data by years and getting observation numbers
+dataSOEP_groupby_year <- dataSOEP %>%
+ group_by(syear)%>%
+ mutate(giveaway_obs = length(giveaway[!is.na(giveaway)]),
+        lifegoal_help_obs = length(lifegoal_help[!is.na(lifegoal_help)]),
+        lifegoal_so_po_obs = length(lifegoal_so_po[!is.na(lifegoal_so_po)]),
+        lifegoal_friends_obs =length(lifegoal_friends[!is.na(lifegoal_friends)]))
+
+#Change year type, not necessary so deleted
+#dataSOEP_groupby_year$syear <- as.Date(as.character(dataSOEP_groupby_year$syear), format = "%Y")
+```
+
+### 10.000 EUR Question
+```{r Plot 1, results='asis', message=FALSE, warning=FALSE}
+## Created: Aysu (last edit 6th Dec 2021)
+x <- ggplot(data = dataSOEP_groupby_year, aes(x=syear, y=giveaway_obs)) +
+   geom_segment( aes(x=syear, xend=syear, y=0, yend=giveaway_obs), color="skyblue") +
+   geom_point(color="blue") +
+   scale_x_continuous(breaks=seq(1984, 2019, 1)) +
+   ylab("Observations") +
+   xlab("Years")+
+   labs(title="Gift of 10.000 EUR") +
+   theme_light() +
+   theme(axis.text.x = element_text(angle = 90))
+x
+```
+
+### Life Goals Question - Being there for others 
+```{r Plot 2.1, results='asis', message=FALSE, warning=FALSE}
+## Created: Aysu (last edit 6th Dec 2021)
+y <- ggplot(data = dataSOEP_groupby_year, aes(x=syear, y=lifegoal_help_obs)) +
+  geom_segment( aes(x=syear, xend=syear, y=0, yend=lifegoal_help_obs), color="skyblue") +
+  geom_point(color="blue") +
+  scale_x_continuous(breaks=seq(1984, 2019, 1)) +
+  ylab("Observations") +
+  xlab("Years")+
+  labs(title="Life Goals, Being There for Others") +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 90))
+y
+```
+
+### Life Goals Question - Being politically, socially active
+```{r Plot 2.2, results='asis', message=FALSE, warning=FALSE}
+## Created: Aysu (last edit 6th Dec 2021)
+y <- ggplot(data = dataSOEP_groupby_year, aes(x=syear, y=lifegoal_so_po_obs)) +
+  geom_segment( aes(x=syear, xend=syear, y=0, yend=lifegoal_so_po_obs), color="skyblue") +
+  geom_point(color="blue") +
+  scale_x_continuous(breaks=seq(1984, 2019, 1)) +
+  ylab("Observations") +
+  xlab("Years")+
+  labs(title="Life Goals, Being Politically and Socially Active") +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 90))
+y
+```
+
+### Life Goals Question - Importance Of Circle Of Friends
+```{r Plot 2.3, results='asis', message=FALSE, warning=FALSE}
+## Created: Aysu (last edit 6th Dec 2021)
+y <- ggplot(data = dataSOEP_groupby_year, aes(x=syear, y=lifegoal_friends_obs)) +
+  geom_segment( aes(x=syear, xend=syear, y=0, yend=lifegoal_friends_obs), color="skyblue") +
+  geom_point(color="blue") +
+  scale_x_continuous(breaks=seq(1984, 2019, 1)) +
+  ylab("Observations") +
+  xlab("Years")+
+  labs(title="Life Goals, Importance Of Circle Of Friends") +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 90))
+y
+```
+
+## Age Relation{.tabset}
+
+### histogram of age and the observations
+Life goal question: being there for others
+```{r Plot 3.1, results='asis', message=FALSE, warning=FALSE}
+amount_observ_lifegoal_help <- subset(dataSOEP_ageclean, is.na(dataSOEP_ageclean$lifegoal_help_r)==FALSE ,select = c("lifegoal_help_r", "age"))
+a <- ggplot(data = amount_observ_lifegoal_help, aes(x=age)) +
+  geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Age") +
+  scale_x_continuous(breaks=seq(min(amount_observ_lifegoal_help$age), max(amount_observ_lifegoal_help$age), 3))+
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 90)) +  
+  labs(title= "Amount of Observations about Lifegoal being there for others question", caption = "Only 3 observations for 16 years old, 0 for 15 and 1 for 14 years old")
+a
+```
+
+The amount of 10.000 euros gift to give away
+```{r Plot 3.2, results='asis', message=FALSE, warning=FALSE}
+##Created by Zixin(8th Jan 2022)
+amount_observ_giveaway <- subset(dataSOEP_ageclean, is.na(dataSOEP_ageclean$giveaway)==FALSE ,select = c("giveaway", "age"))
+b <- ggplot(data = amount_observ_giveaway, aes(x=age)) +
+  geom_bar(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Age") +
+  scale_x_continuous(breaks=seq(min(amount_observ_giveaway$age), max(amount_observ_giveaway$age), 3))+
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 90)) +  
+  labs(title= "Amount of Observations about the Amount of 10.000 Euros to Give Away", caption = "Only 3 observations for 16 years old, 0 for 15 and 1 for 14 years old")
+b
+```
+
+### 10.000 EUR Question
+
+```{r, warning=FALSE, message=FALSE}
+## Created: Felix
+#drop missing and negative giveaway
+dataSOEP_no_nan_giveaway <- subset(dataSOEP_ageclean, giveaway>=0)
+#group all people older than 95
+dataSOEP_no_nan_giveaway$age[dataSOEP_no_nan_giveaway$age >=95] <- 95
+dataSOEP_no_nan_giveaway$age[dataSOEP_no_nan_giveaway$age <=18] <- 18
+#sort by age and calculate mean of "giveaway"
+sum_SOEP <- ddply(dataSOEP_no_nan_giveaway, c("age"), summarise,
+                  N    = length(giveaway),
+                  mean_giveaway = mean(giveaway),
+                  sd   = sd(giveaway),
+                  se   = sd / sqrt(N)
+)
+```
+
+```{r Plot 4, results='asis', warning=FALSE, message=FALSE}
+#plot average giveaway to age
+x <- ggplot(data=sum_SOEP, aes(x=age, y=mean_giveaway)) + 
+  geom_errorbar(aes(ymin=mean_giveaway-se, ymax=mean_giveaway+se),color='red') +
+  geom_point(color='blue') +
+  ylab("Amount of 10,000 Euros to give away") +
+  theme_light() +
+  scale_x_discrete("Age", limits=c(20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95))
+x
+```
+
+### Life Goals "Being there for others" Question
+
+```{r, warning=FALSE, message=FALSE}
+## Created: Felix
+
+#drop missing lifegoal_help_r
+dataSOEP_no_nan_lifegoal_help<- drop_na(dataSOEP_ageclean, lifegoal_help_r) 
+#group all younger and older people
+dataSOEP_no_nan_lifegoal_help$age[dataSOEP_no_nan_lifegoal_help$age >=95] <- 95
+dataSOEP_no_nan_lifegoal_help$age[dataSOEP_no_nan_lifegoal_help$age <=18] <- 18
+#sort by age and calculate mean of "lifegoal_help_r"
+sum_SOEP2 <- ddply(dataSOEP_no_nan_lifegoal_help, c("age"), summarise,
+                   N    = length(lifegoal_help_r),
+                   mean_lifegoal_help = mean(lifegoal_help_r),
+                   sd   = sd(lifegoal_help_r),
+                   se   = sd / sqrt(N)
+)
+```
+
+```{r Plot 5, message=FALSE, warning=FALSE, results='asis'}
+y <- ggplot(data=sum_SOEP2, aes(x=age, y=mean_lifegoal_help)) + 
+  geom_errorbar(aes(ymin=mean_lifegoal_help-se, ymax=mean_lifegoal_help+se),color='red') +
+  geom_point(color='blue') +
+  ylab("Importance of Being There for Others") +
+  theme_light() +
+  scale_x_discrete("Age", limits=c(20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95))
+y
+```
+
+### Life Goals "Being politically, socially active" Question
+
+```{r, warning=FALSE, message=FALSE}
+## Created: Felix
+
+#drop missing lifegoal_so_po_r
+dataSOEP_no_nan_lifegoal_so_po<- drop_na(dataSOEP_ageclean, lifegoal_so_po_r) 
+#group all younger and older people
+dataSOEP_no_nan_lifegoal_so_po$age[dataSOEP_no_nan_lifegoal_so_po$age >=95] <- 95
+dataSOEP_no_nan_lifegoal_so_po$age[dataSOEP_no_nan_lifegoal_so_po$age <=18] <- 18
+#sort by age and calculate mean of "lifegoal_help_r"
+sum_SOEP2 <- ddply(dataSOEP_no_nan_lifegoal_so_po, c("age"), summarise,
+                   N    = length(lifegoal_so_po_r),
+                   mean_lifegoal_so_po = mean(lifegoal_so_po_r),
+                   sd   = sd(lifegoal_so_po_r),
+                   se   = sd / sqrt(N)
+)
+```
+
+```{r Plot 6, warning=FALSE, message=FALSE, results='asis'}
+z <- ggplot(data=sum_SOEP2, aes(x=age, y=mean_lifegoal_so_po)) + 
+  geom_errorbar(aes(ymin=mean_lifegoal_so_po-se, ymax=mean_lifegoal_so_po+se),color='red') +
+  geom_point(color='blue') +
+  ylab("Importance of Being Politically and Socially Active") +
+  theme_light() +
+  scale_x_discrete("Age", limits=c(20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95)) +
+  theme(axis.text.x = element_text(angle = 90))
+z
+```
+
+
+
+## Distribution of the Sample
+```{r}
+#Creating 2010 data
+dataSOEP_2010 <- dataSOEP_ageclean[dataSOEP_ageclean$syear==2010,]
+#Creating 2008 data
+dataSOEP_2008 <- dataSOEP_ageclean[dataSOEP_ageclean$syear==2008,]
+```
+
+```{r, echo=F}
+#Setting the right variable type
+dataSOEP_2008$lifegoal_help<- as.numeric(as.character(dataSOEP_2008$lifegoal_help))
+dataSOEP_2008$lifegoal_help_r<- as.numeric(as.character(dataSOEP_2008$lifegoal_help_r))
+dataSOEP_2008$lifegoal_so_po<- as.numeric(as.character(dataSOEP_2008$lifegoal_so_po))
+dataSOEP_2008$lifegoal_so_po_r<- as.numeric(as.character(dataSOEP_2008$lifegoal_so_po_r))
+```
+
+### Gender{.tabset}
+
+#### 2008
+
+```{r Plot 7, results='asis', warning=FALSE, message=FALSE}
+## Created: Aysu (last edit 6th Dec 2021)
+a <- ggplot(data = dataSOEP_2008, aes(x=sex)) +
+  geom_histogram(fill="skyblue", color="black", binwidth=0.5) +
+  ylab("Observations") +
+  xlab("Gender") +
+  scale_x_continuous(breaks=seq(1, 2, 1), labels = c("male", "female")) +
+  scale_y_continuous(breaks=seq(0, 70000, 5000)) +
+  theme_light() 
+a 
+```
+
+#### 2010
+
+```{r Plot 8, results='asis', warning=FALSE, message=FALSE}
+## Created: Aysu (last edit 6th Dec 2021)
+a <- ggplot(data = dataSOEP_2010, aes(x=sex)) +
+  geom_histogram(fill="skyblue", color="black", binwidth=0.5) +
+  ylab("Observations") +
+  xlab("Gender") +
+  scale_x_continuous(breaks=seq(1, 2, 1), labels = c("male", "female")) +
+  scale_y_continuous(breaks=seq(0, 70000, 5000)) +
+  theme_light() 
+a 
+```
+
+### Age{.tabset}
+
+#### 2008
+```{r Plot 9, results='asis', warning=FALSE, message=FALSE}
+## Created: Aysu (last edit 6th Dec 2021)
+a <- ggplot(data = dataSOEP_2008, aes(x=age)) +
+  geom_histogram(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Age") +
+  scale_x_continuous(breaks=seq(min(dataSOEP_2008$age), max(dataSOEP_2008$age), 5))+
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 90)) 
+a 
+```
+
+#### 2010
+```{r, echo=F}
+#deleted, looks unnecesssary
+#dataSOEP_2010$age_correct <- as.numeric(2018 - dataSOEP_2010$ple0010_h)
+#dataSOEP_2010$age_correct <- as.numeric(2018 - dataSOEP_2010$birth_year)
+```
+
+```{r Plot 10, results='asis', warning=FALSE, message=FALSE}
+## Created: Aysu (last edit 6th Dec 2021)
+a <- ggplot(data = dataSOEP_2010, aes(x=age)) +
+  geom_histogram(fill="skyblue", color="black") +
+  ylab("Observations") +
+  xlab("Age") +
+  scale_x_continuous(breaks=seq(min(dataSOEP_2010$age), max(dataSOEP_2010$age), 5))+
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 90)) 
+a 
+```
+
+### Altruism Scales{.tabset}
+
+#### 2008
+
+Life Goals Question -  Being there for others 
+```{r Plot 11, results='asis', message=FALSE, warning=FALSE}
+## Created: Aysu (last edit 6th Dec 2021)
+b <- ggplot(data = dataSOEP_2008, aes(x=lifegoal_help)) +
+  geom_histogram(color="black", fill="skyblue") +
+  ylab("Observations") +
+  scale_x_discrete(labels=c("1" = "Very Important", "2" = "Important",
+                            "3" = "Less Important", "4"= "Unimportant")) +
+  xlim("Very Important","Important", "Less Important", "Unimportant") +
+  xlab("Importance: Being There for Others") +
+  theme_light()
+b
+```
+
+Life Goals Question -  Being politically, socially active
+```{r Plot 12, results='asis', message=FALSE, warning=FALSE}
+## Created: Zixin (last edit 7th Dec 2021)
+
+c <- ggplot(data = dataSOEP_2008, aes(x=lifegoal_so_po)) +
+  geom_histogram(color="black", fill="skyblue") +
+  ylab("Observations") +
+  scale_x_discrete(labels=c("1" = "Very Important", "2" = "Important",
+                            "3" = "Less Important", "4"= "Unimportant")) +
+  xlim("Very Important","Important", "Less Important", "Unimportant") +
+  xlab("Importance: Being politically, socially active") +
+  theme_light()
+c
+```
+
+#### 2010
+
+10.000 EUR Question
+```{r Plot 13, results='asis', message=FALSE, warning=FALSE}
+## Created: Aysu (last edit 6th Dec 2021)
+a <- ggplot(data = dataSOEP_2010, aes(x=giveaway)) +
+  geom_histogram(color="black", fill="skyblue") +
+  ylab("Number of Observations") +
+  xlab("Amount Willing to Give Away in Euros") +
+  scale_x_continuous(breaks=seq(0, 10000, 500)) +
+  geom_vline(aes(xintercept = mean(giveaway, na.rm = TRUE)),col='blue',size=1, linetype="dashed") +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90))
+a
+```
+
+### Description tables of scales value by Gender {.tabset}
+
+#### Life goal in 2008
+
+```{r, echo=F}
+dataSOEP_2008$gender <- as.character(ifelse(dataSOEP_2008$sex==2, "female", "male"))
+```
+Life Goals Question -  Being there for others 
+- lifegoal_help is reverse coded("4" = "Very Important", "3" = "Important", "2" = "Less Important", "1"= "Unimportant")
+```{r, results='asis'}
+## Created: Aysu (last edit 6th Dec 2021)
+pander(tapply(dataSOEP_2008$lifegoal_help_r, dataSOEP_2008$gender, summary))
+```
+Life Goals Question -  Being politically, socially active
+- lifegoal_so_po is reverse coded("4" = "Very Important", "3" = "Important", "2" = "Less Important", "1"= "Unimportant")
+```{r, results='asis'}
+## Created: Aysu (last edit 6th Dec 2021)
+pander(tapply(dataSOEP_2008$lifegoal_so_po_r, dataSOEP_2008$gender, summary))
+```
+
+#### Give away in 2010
+```{r, echo=F}
+dataSOEP_2010$gender <- as.character(ifelse(dataSOEP_2010$sex==2, "female", "male"))
+```
+```{r, results='asis'}
+## Created: Aysu (last edit 6th Dec 2021)
+pander(tapply(dataSOEP_2010$giveaway, dataSOEP_2010$gender, summary))
+```
+
+## Regressions with 10.000 EUR Question{.tabset}
+
+### Subscribed money
+``` {r Table 1, results ='asis', message=FALSE, warning=FALSE}
+## Created: Yashaswini (4th Dec 2021)
+## Edited: Aysu (6th Dec 2021) -Robust SE, alternative regs, age2, knit error fix,
+## Money donate dummy
+## Edited: Zixin (10th Dec 2021), use netincome_divided instead of pglabnet
+dataSOEP_ageclean$money_donated <- ifelse(dataSOEP_ageclean$money_subscribe==1, 1, 0)
+
+cross_sectionA <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2010,
+                         select= c("money_donated", "s_giveaway_divided", "age_divided", "age2_divided", "female", "pgbilzeit", "netincome_divided"))
+cross_sectionA <- na.omit(cross_sectionA)
+
+reg1 <- lm(money_donated ~ s_giveaway_divided + age_divided + age2_divided + female, data= cross_sectionA)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(money_donated ~ s_giveaway_divided + age_divided + age2_divided + female + netincome_divided, data= cross_sectionA)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(money_donated ~ s_giveaway_divided + age_divided + age2_divided + female + netincome_divided + pgbilzeit, data= cross_sectionA)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+stargazer(reg1, reg2, reg3, type="html",
+          se=list(se_1, se_2, se_3), column.separate = c(1,1,1),
+          dep.var.labels= c("Subscribing money"),
+          covariate.labels= c("amount 10,000 euros give away/1000", "age/10", "age squared/100", "female", "net income/1000","education"),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses.")
+```
+
+### Subscribed money_h
+Harmonized two variables: subscribing money dummy and amount. So, not subscribing is coded as 0. 
+``` {r Table 2, results ='asis', message=FALSE, warning=FALSE}
+## Created: Aysu (6th Dec 2021)
+## Edited: Yashaswini (9th Dec 2021)
+## Edited: Zixin (10th Dec 2021), use netincome_divided instead of pglabnet
+
+## harmonizing two variables
+dataSOEP_ageclean$money_donated_h <- ifelse(dataSOEP_ageclean$money_donated==1, dataSOEP_ageclean$money_subscribe_amount, 0)
+
+cross_sectionB <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2010,
+                         select= c("money_donated_h", "s_giveaway_divided", "age_divided", "age2_divided", "female",                                "pgbilzeit", "netincome_divided"))
+cross_sectionB <- na.omit(cross_sectionB)
+
+
+reg1 <- tobit(money_donated_h ~ s_giveaway_divided + age_divided + age2_divided + female, left=0, data= cross_sectionB)
+
+reg2 <- tobit(money_donated_h ~ s_giveaway_divided + age_divided + age2_divided + female + netincome_divided, left=0, data=cross_sectionB)
+
+reg3 <- tobit(money_donated_h ~ s_giveaway_divided + age_divided + age2_divided + female + netincome_divided + pgbilzeit, left=0, data= cross_sectionB)
+
+stargazer(reg1, reg2, reg3, type="html",
+          column.separate = c(1,1,1),
+          dep.var.labels= c("Tobit model: Amount subscribed"),
+          covariate.labels= c("amount 10,000 euros give away/1000", "age/10", "age squared/100", "female", "net income/1000","education"))
+```
+
+
+### Blood donation(exclude medical reason)
+``` {r Table 3, results ='asis', message=FALSE, warning=FALSE}
+## Created by Zixin(2021/12/5)
+## Edited: Aysu (6th Dec 2021) -age2 (needs some though)
+##Edited: Zixin (10th Dec 2021)
+
+#medical reason of no donation dummy
+dataSOEP_ageclean$medicalreason_notdonated <- ifelse(dataSOEP_ageclean$medicalreason_no_donation==1, 1, 0)  ##if medicalreason_notdonated = 1, then no donation because of medical reason
+
+#blood donation in last 10 years dummy
+dataSOEP_ageclean$blood_donated_10years <- ifelse(dataSOEP_ageclean$blood_donation_tenyears==1, 1, 0) ##if this equal to 1, then there is blood donation.
+# subtract the people who didn't donate blood because of medical reason
+cross_sectionC_a <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2010,
+                         select= c("blood_donated_10years","s_giveaway_divided", "age_divided", "age2_divided" , "female", "pgbilzeit","netincome_divided","medicalreason_notdonated"))
+cross_sectionC_a$medicalreason_notdonated_new <- ifelse(cross_sectionC_a$blood_donated_10years == 1, 0, cross_sectionC_a$medicalreason_notdonated)
+
+
+cross_sectionC_a <- select(cross_sectionC_a, -8)
+cross_sectionC_a <- na.omit(cross_sectionC_a)
+
+cross_sectionC <- subset(cross_sectionC_a, cross_sectionC_a$medicalreason_notdonated_new == 0)
+
+reg1 <- lm(blood_donated_10years ~ s_giveaway_divided + age_divided + age2_divided + female, data= cross_sectionC)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(blood_donated_10years ~ s_giveaway_divided + age_divided + age2_divided + female + netincome_divided, data= cross_sectionC)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(blood_donated_10years ~ s_giveaway_divided + age_divided + age2_divided + female + netincome_divided + pgbilzeit, data= cross_sectionC)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+stargazer(reg1, reg2, reg3, type="html",
+          se=list(se_1, se_2, se_3), column.separate = c(1,1,1),
+          dep.var.labels= c("blood donated in the last 10 years"),
+          covariate.labels= c("amount 10k euros give away/1000", "age/10", "age squared/100", "female", "net income/1000","education"),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses.")
+```
+
+## Volunteer Work  {.tabset}
+
+### Volunteer Work with 2017 data--Give away
+In order to compare our two altruism scales with the same behavior. Variable is reverse coded as 4 =Daily or Min 1x per week, 3= Min 1x per Month, 4= Less common, 5=Never.
+``` {r Table 4, results ='asis', message=FALSE, warning=FALSE}
+## Created: Aysu (6th Dec 2021)
+## harmonizing two variables
+cross_sectionD <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2017,
+                         select= c("volunteer_work_r", "s_giveaway_divided", "age_divided", "age2_divided", "female", "pgbilzeit", "netincome_divided"))
+cross_sectionD <- na.omit(cross_sectionD)
+
+reg1 <- lm(volunteer_work_r ~ s_giveaway_divided + age_divided + age2_divided + female, data= cross_sectionD)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(volunteer_work_r ~ s_giveaway_divided + age_divided + age2_divided + female + netincome_divided, data= cross_sectionD)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(volunteer_work_r ~ s_giveaway_divided + age_divided + age2_divided + female + netincome_divided + pgbilzeit, data= cross_sectionD)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+stargazer(reg1, reg2, reg3, type="html",
+          se=list(se_1, se_2, se_3), column.separate = c(1,1,1),
+          dep.var.labels= c("Volunteer Work"),
+          covariate.labels= c("amount 10,000 euros give away/1000", "age/10", "age squared/100", "female", "net income/1000","education"),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses.")
+```
+
+### Volunteer Work with 2008 data--Life Goal
+
+``` {r Table 5, results ='asis', message=FALSE, warning=FALSE}
+## Created: Aysu (6th Dec 2021)
+## Edited: Zixin (10th Dec 2021)
+cross_sectionE <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2008,
+                         select= c("volunteer_work_r", "s_lifegoal_help_r","s_lifegoal_so_po_r", "age_divided", "age2_divided", "female", "pgbilzeit", "netincome_divided", "health"))
+cross_sectionE <- na.omit(cross_sectionE)
+
+reg1 <- lm(volunteer_work_r ~ s_lifegoal_help_r +s_lifegoal_so_po_r + age_divided + age2_divided + female, data= cross_sectionE)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(volunteer_work_r ~ s_lifegoal_help_r +s_lifegoal_so_po_r + age_divided + age2_divided + female + netincome_divided, data= cross_sectionE)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(volunteer_work_r ~ s_lifegoal_help_r +s_lifegoal_so_po_r + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, data= cross_sectionE)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+stargazer(reg1, reg2, reg3, type="html",
+          se=list(se_1, se_2, se_3), column.separate = c(1,1,1),
+          dep.var.labels= c("Volunteer Work"),
+          covariate.labels= c("life goal, being there for others","life goal, to be socially and potically active", "age/10", "age squared/100", "female", "net income/1000","education", "health"),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses.")
+
+```
+
+
+## Regressions with Separate Measures  {.tabset}
+
+### Tobit model: Amount subscribed
+```{r Table 6, results ='asis', message=FALSE, warning=FALSE}
+##Created by Zixin(Dec 13 2021)
+cross_sectionV <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2010,
+                         select= c("money_donated_h","s_giveaway_2010_divided", "s_lifegoal_help_2008_r","s_lifegoal_so_po_2008_r", "age_divided", "age2_divided", "female","pgbilzeit", "netincome_divided", "health"))
+cross_sectionV <- na.omit(cross_sectionV)
+
+reg1 <- tobit(money_donated_h ~ s_giveaway_2010_divided + age_divided + age2_divided, left=0, data= cross_sectionV)
+
+reg2 <- tobit(money_donated_h ~ s_giveaway_2010_divided + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionV)
+
+reg3 <- tobit(money_donated_h ~ s_lifegoal_help_2008_r + age_divided + age2_divided, left=0, data= cross_sectionV)
+
+
+reg4 <- tobit(money_donated_h ~ s_lifegoal_help_2008_r + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionV)
+
+reg5 <- tobit(money_donated_h ~ s_lifegoal_so_po_2008_r + age_divided + age2_divided, left=0, data= cross_sectionV)
+
+reg6 <- tobit(money_donated_h ~ s_lifegoal_so_po_2008_r + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionV)
+
+reg7 <- tobit(money_donated_h ~ s_giveaway_2010_divided + s_lifegoal_help_2008_r +s_lifegoal_so_po_2008_r + age_divided + age2_divided, left=0, data= cross_sectionV)
+
+reg8 <- tobit(money_donated_h ~ s_giveaway_2010_divided + s_lifegoal_help_2008_r +s_lifegoal_so_po_2008_r + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionV)
+
+
+stargazer(reg1, reg2, reg3, reg4, reg5, reg6, reg7, reg8, type="html",
+          column.separate = c(2,2,2),
+          dep.var.labels= c("Tobit model: Amount subscribed"),
+          covariate.labels= c("standaridized amount 10,000 euros give away/1000 in 2010","standardized life goal, being there for others in 2008","standardized life goal, to be socially and potically active in 2008", "age/10", "age squared/100", "female", "net income/1000","education","health"),
+           notes.align = "l"
+        )
+
+```
+
+### Blood Donation
+```{r Table 7, results ='asis', message=FALSE, warning=FALSE}
+##Created by Zixin(Dec 13 2021)
+cross_sectionW <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2010,
+                         select= c("blood_donated_10years","s_giveaway_2010_divided", "s_lifegoal_help_2008_r","s_lifegoal_so_po_2008_r", "age_divided", "age2_divided", "female","pgbilzeit", "netincome_divided", "health", "medicalreason_notdonated"))
+
+cross_sectionW$medicalreason_notdonated_new <- ifelse(cross_sectionW$blood_donated_10years == 1, 0, cross_sectionW$medicalreason_notdonated)
+
+cross_sectionW <- select(cross_sectionW, -11)
+cross_sectionW <- na.omit(cross_sectionW)
+
+cross_sectionW <- subset(cross_sectionW, cross_sectionW$medicalreason_notdonated_new == 0)
+cross_sectionW$blood_donated_10years_mean <- mean(cross_sectionW$blood_donated_10years)
+
+reg1 <- lm(blood_donated_10years ~ s_giveaway_2010_divided + age_divided + age2_divided, left=0, data= cross_sectionW)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(blood_donated_10years ~ s_giveaway_2010_divided + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionW)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(blood_donated_10years ~ s_lifegoal_help_2008_r + age_divided + age2_divided, left=0, data= cross_sectionW)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg4 <- lm(blood_donated_10years ~ s_lifegoal_help_2008_r + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionW)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+reg5 <- lm(blood_donated_10years ~ s_lifegoal_so_po_2008_r + age_divided + age2_divided, left=0, data= cross_sectionW)
+cov_5 <- vcovHC(reg5)
+se_5 <- sqrt(diag(cov_5))
+
+reg6 <- lm(blood_donated_10years ~ s_lifegoal_so_po_2008_r + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionW)
+cov_6 <- vcovHC(reg6)
+se_6 <- sqrt(diag(cov_6))
+
+reg7 <- lm(blood_donated_10years ~ s_giveaway_2010_divided + s_lifegoal_help_2008_r +s_lifegoal_so_po_2008_r + age_divided + age2_divided, left=0, data= cross_sectionW)
+cov_7 <- vcovHC(reg7)
+se_7 <- sqrt(diag(cov_7))
+
+reg8 <- lm(blood_donated_10years ~ s_giveaway_2010_divided + s_lifegoal_help_2008_r +s_lifegoal_so_po_2008_r + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionW)
+cov_8 <- vcovHC(reg8)
+se_8 <- sqrt(diag(cov_8))
+
+
+stargazer(reg1, reg2, reg3, reg4, reg5, reg6, reg7, reg8, type="html",
+          se=list(se_1, se_2, se_3, se_4, se_5, se_6,se_7, se_8),
+          column.separate = c(2,2,2),
+          dep.var.labels= c("Blood Donation in the Last 10 Years"),
+          covariate.labels= c("standaridized amount 10,000 euros give away/1000 in 2010","standardized life goal, being there for others in 2008","standardized life goal, to be socially and potically active in 2008", "age/10", "age squared/100", "female", "net income/1000","education","health"),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses. The mean of blood donation in the last ten years is about 0.1845."
+        )
+
+
+```
+
+### Volunteer work
+
+```{r Table 8, results ='asis', message=FALSE, warning=FALSE}
+## Created by Felix (Dec 13 2021)
+cross_sectionZ <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2017,
+                         select= c("volunteer_work_r","s_giveaway_2017_divided", "s_lifegoal_help_2016_r","s_lifegoal_so_po_2016_r", "age_divided", "age2_divided", "female","pgbilzeit", "netincome_divided", "health"))
+
+cross_sectionZ$volunteer_work_r <- ifelse(cross_sectionZ$volunteer_work_r == 1, 0, 1)
+
+cross_sectionZ <- na.omit(cross_sectionZ)
+
+reg1 <- lm(volunteer_work_r ~ s_giveaway_2017_divided + age_divided + age2_divided, left=0, data= cross_sectionZ)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(volunteer_work_r ~ s_giveaway_2017_divided + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionZ)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(volunteer_work_r ~ s_lifegoal_help_2016_r + age_divided + age2_divided, left=0, data= cross_sectionZ)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg4 <- lm(volunteer_work_r ~ s_lifegoal_help_2016_r + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionZ)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+reg5 <- lm(volunteer_work_r ~ s_lifegoal_so_po_2016_r + age_divided + age2_divided, left=0, data= cross_sectionZ)
+cov_5 <- vcovHC(reg5)
+se_5 <- sqrt(diag(cov_5))
+
+reg6 <- lm(volunteer_work_r ~ s_lifegoal_so_po_2016_r + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionZ)
+cov_6 <- vcovHC(reg6)
+se_6 <- sqrt(diag(cov_6))
+
+reg7 <- lm(volunteer_work_r ~ s_giveaway_2017_divided + s_lifegoal_help_2016_r +s_lifegoal_so_po_2016_r + age_divided + age2_divided, left=0, data= cross_sectionZ)
+cov_7 <- vcovHC(reg7)
+se_7 <- sqrt(diag(cov_7))
+
+reg8 <- lm(volunteer_work_r ~ s_giveaway_2017_divided + s_lifegoal_help_2016_r +s_lifegoal_so_po_2016_r + age_divided + age2_divided + female + netincome_divided + pgbilzeit + health, left=0, data= cross_sectionZ)
+cov_8 <- vcovHC(reg8)
+se_8 <- sqrt(diag(cov_8))
+
+
+stargazer(reg1, reg2, reg3, reg4, reg5, reg6, reg7, reg8, type="html",
+          se=list(se_1, se_2, se_3, se_4, se_5, se_6,se_7, se_8),
+          column.separate = c(2,2,2),
+          dep.var.labels= c("Volunteer work"),
+          covariate.labels= c("standaridized amount 10,000 euros give away/1000 in 2017","standardized life goal, being there for others in 2016","standardized life goal, to be socially and potically active in 2016", "age/10", "age squared/100", "female", "net income/1000","education","health"),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses. The mean of volunteer work is about 0.4624."
+        )
+
+```
+
+## Regressing Altruism Scales{.tabset}
+
+### 10.000 EUR Question--2010
+Using Individual Income
+```{r Table 9.1, results ='asis', message=FALSE, warning=FALSE}
+##Created by Aysu (17th December 2021)
+##Edited by Aysu (19th December 2021)
+cross_sectionAA <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2010,
+                         select= c("giveaway_divided","s_giveaway_divided", "age_divided", "age2_divided","female", "pgbilzeit", "netincome_divided", "health", "emp_status", "religion_2011", "political_attitude_2009"))
+cross_sectionAA <- na.omit(cross_sectionAA)
+
+cross_sectionAA$f_religion_2011 <- relevel(factor(cross_sectionAA$religion_2011), ref=1) #Taking being catholic as reference
+cross_sectionAA$f_emp_status <- relevel(factor(cross_sectionAA$emp_status), ref=1) #Taking being full time employed as reference
+
+reg1 <- lm(giveaway_divided ~ age_divided + age2_divided, data= cross_sectionAA)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(giveaway_divided ~ age_divided + age2_divided + female + pgbilzeit + netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAA)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(s_giveaway_divided ~ age_divided + age2_divided, data= cross_sectionAA)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg4 <- lm(s_giveaway_divided ~ age_divided + age2_divided + female + pgbilzeit + netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAA)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+stargazer(reg1, reg2, reg3, reg4, type="html",
+          se=list(se_1, se_2, se_3, se_4),
+          column.labels = c("Give Away/1000", "Give Away/1000, Standardized"),
+          covariate.labels= c("age/10", "age squared/100", "female","education in years" ,"net income/1000","health", "evangelical", "other christian", "islamic religious community", "other", "non-denominational", "regular part-time", "vocational training", "other part-time", "unemployed", "sheltered workshop", "political attitude(0=completely left, 10=completely right"),
+          column.separate = c(2,2),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+
+Using Household Income
+```{r Table 9.2, results ='asis', message=FALSE, warning=FALSE}
+##Created by Aysu (17th December 2021)
+##Edited by Aysu (19th December 2021)
+cross_sectionAA_2 <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2010,
+                         select= c("giveaway_divided","s_giveaway_divided", "age_divided", "age2_divided","female", "pgbilzeit", "hh_netincome_divided", "health", "emp_status", "religion_2011", "political_attitude_2009"))
+cross_sectionAA_2 <- na.omit(cross_sectionAA_2)
+
+cross_sectionAA_2$f_religion_2011 <- relevel(factor(cross_sectionAA_2$religion_2011), ref=1) #Taking being catholic as reference
+cross_sectionAA_2$f_emp_status <- relevel(factor(cross_sectionAA_2$emp_status), ref=1) #Taking being full time employed as reference
+
+
+reg1 <- lm(giveaway_divided ~ age_divided + age2_divided, data= cross_sectionAA_2)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(giveaway_divided ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAA_2)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(s_giveaway_divided ~ age_divided + age2_divided, data= cross_sectionAA_2)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg4 <- lm(s_giveaway_divided ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAA_2)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+stargazer(reg1, reg2, reg3, reg4, type="html",
+          se=list(se_1, se_2, se_3, se_4),
+          column.labels = c("Give Away/1000", "Give Away/1000, Standardized"),
+          covariate.labels= c("age/10", "age squared/100", "female","education in years" ,"net income/1000","health", "evangelical", "other christian", "islamic religious community", "other", "non-denominational", "regular part-time", "vocational training", "other part-time", "unemployed", "sheltered workshop", "political attitude(0=completely left, 10=completely right"),
+          column.separate = c(2,2),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+
+### 10.000 EUR Question--2017
+Using Individual Income
+```{r Table 10.1, results ='asis', message=FALSE, warning=FALSE}
+##Created by Zixin(6th Jan 2022)
+cross_sectionAAA <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2017,
+                         select= c("giveaway_divided","s_giveaway_divided", "age_divided", "age2_divided","female", "pgbilzeit", "netincome_divided", "health", "emp_status", "religion_2015", "political_attitude_2014"))
+cross_sectionAAA <- na.omit(cross_sectionAAA)
+
+cross_sectionAAA$f_religion_2015 <- relevel(factor(cross_sectionAAA$religion_2015), ref=1) #Taking being catholic as reference
+cross_sectionAAA$f_emp_status <- relevel(factor(cross_sectionAAA$emp_status), ref=1) #Taking being full time employed as reference
+
+reg1 <- lm(giveaway_divided ~ age_divided + age2_divided, data= cross_sectionAAA)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(giveaway_divided ~ age_divided + age2_divided + female + pgbilzeit + netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAA)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(s_giveaway_divided ~ age_divided + age2_divided, data= cross_sectionAAA)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg4 <- lm(s_giveaway_divided ~ age_divided + age2_divided + female + pgbilzeit + netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAA)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+stargazer(reg1, reg2, reg3, reg4, type="html",
+          se=list(se_1, se_2, se_3, se_4),
+          column.labels = c("Give Away/1000", "Give Away/1000, Standardized"),
+          covariate.labels= c("age/10", "age squared/100", "female","education in years" ,"net income/1000","health", "evangelical", "other christian", "islamic religious community", "other", "non-denominational","christian orthodox","shiite religious community","sunni religious community","alevi religious community","regular part-time", "vocational training", "other part-time", "unemployed", "sheltered workshop", "political attitude(0=completely left, 10=completely right"),
+          column.separate = c(2,2),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+
+Using Household Income
+```{r Table 10.2, results ='asis', message=FALSE, warning=FALSE}
+##Created by Zixin(6th Jan 2022)
+cross_sectionAAA_2 <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2017,
+                         select= c("giveaway_divided","s_giveaway_divided", "age_divided", "age2_divided","female", "pgbilzeit", "hh_netincome_divided", "health", "emp_status", "religion_2015", "political_attitude_2014"))
+cross_sectionAAA_2 <- na.omit(cross_sectionAAA_2)
+
+cross_sectionAAA_2$f_religion_2015 <- relevel(factor(cross_sectionAAA_2$religion_2015), ref=1) #Taking being catholic as reference
+cross_sectionAAA_2$f_emp_status <- relevel(factor(cross_sectionAAA_2$emp_status), ref=1) #Taking being full time employed as reference
+
+reg1 <- lm(giveaway_divided ~ age_divided + age2_divided, data= cross_sectionAAA_2)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(giveaway_divided ~  age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAA_2)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(s_giveaway_divided ~ age_divided + age2_divided, data= cross_sectionAAA_2)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg4 <- lm(s_giveaway_divided ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAA_2)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+stargazer(reg1, reg2, reg3, reg4, type="html",
+          se=list(se_1, se_2, se_3, se_4),
+          column.labels = c("Give Away/1000", "Give Away/1000, Standardized"),
+          covariate.labels= c("age/10", "age squared/100", "female","education in years" ,"net income/1000","health", "evangelical", "other christian", "islamic religious community", "other", "non-denominational","christian orthodox","shiite religious community","sunni religious community","alevi religious community","regular part-time", "vocational training", "other part-time", "unemployed", "sheltered workshop", "political attitude(0=completely left, 10=completely right"),
+          column.separate = c(2,2),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+
+
+
+### Life Goal Questions--2008
+Using individual income
+```{r Table 11.1, results ='asis', message=FALSE, warning=FALSE}
+##Created by Aysu (17th December 2021)
+
+cross_sectionAB <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2008,
+                         select= c("s_lifegoal_help_r","s_lifegoal_so_po_r", "age_divided", "age2_divided","female", "pgbilzeit", "netincome_divided", "health", "emp_status", "religion_2011", "political_attitude_2009"))
+cross_sectionAB <- na.omit(cross_sectionAB)
+
+cross_sectionAB$f_religion_2011 <- relevel(factor(cross_sectionAB$religion_2011), ref=1) #Taking being catholic as reference
+cross_sectionAB$f_emp_status <- relevel(factor(cross_sectionAB$emp_status), ref=1) #Taking being full time employed as reference
+
+reg1 <- lm(s_lifegoal_help_r ~ age_divided + age2_divided, data= cross_sectionAB)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(s_lifegoal_help_r ~ age_divided + age2_divided + female + pgbilzeit + netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAB)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(s_lifegoal_so_po_r ~ age_divided + age2_divided, data= cross_sectionAB)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg4 <- lm(s_lifegoal_so_po_r ~ age_divided + age2_divided + female + pgbilzeit + netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAB)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+stargazer(reg1, reg2, reg3, reg4, type="html",
+          se=list(se_1, se_2, se_3, se_4),
+          column.labels = c("Being there for others, Standardize", "Being socially and politically active, Standardize"),
+          covariate.labels= c("age/10", "age squared/100", "female","education in years" ,"net income/1000","health", "evangelical", "other christian", "islamic religious community", "other", "non-denominational", "regular part-time", "vocational training", "other part-time", "unemployed", "sheltered workshop", "political attitude(0=completely left, 10=completely right"),
+          column.separate = c(2,2),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+
+Using household income
+```{r Table 11.2, results ='asis', message=FALSE, warning=FALSE}
+##Created by Zixin (19th Jan 2022)
+
+cross_sectionAB <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2008,
+                         select= c("s_lifegoal_help_r","s_lifegoal_so_po_r", "age_divided", "age2_divided","female", "pgbilzeit", "hh_netincome_divided", "health", "emp_status", "religion_2011", "political_attitude_2009"))
+cross_sectionAB <- na.omit(cross_sectionAB)
+
+cross_sectionAB$f_religion_2011 <- relevel(factor(cross_sectionAB$religion_2011), ref=1) #Taking being catholic as reference
+cross_sectionAB$f_emp_status <- relevel(factor(cross_sectionAB$emp_status), ref=1) #Taking being full time employed as reference
+
+reg1 <- lm(s_lifegoal_help_r ~ age_divided + age2_divided, data= cross_sectionAB)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(s_lifegoal_help_r ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAB)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(s_lifegoal_so_po_r ~ age_divided + age2_divided, data= cross_sectionAB)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg4 <- lm(s_lifegoal_so_po_r ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAB)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+stargazer(reg1, reg2, reg3, reg4, type="html",
+          se=list(se_1, se_2, se_3, se_4),
+          column.labels = c("Being there for others, Standardize", "Being socially and politically active, Standardize"),
+          covariate.labels= c("age/10", "age squared/100", "female","education in years" ,"net income/1000","health", "evangelical", "other christian", "islamic religious community", "other", "non-denominational", "regular part-time", "vocational training", "other part-time", "unemployed", "sheltered workshop", "political attitude(0=completely left, 10=completely right"),
+          column.separate = c(2,2),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+### Life Goal Questions--2016
+Using individual income
+```{r Table 12.1, results ='asis', message=FALSE, warning=FALSE}
+##Created by Zixin(6th Jan 2022)
+
+cross_sectionAAB <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2016,
+                         select= c("s_lifegoal_help_r","s_lifegoal_so_po_r", "age_divided", "age2_divided","female", "pgbilzeit", "netincome_divided", "health", "emp_status", "religion_2015", "political_attitude_2014"))
+cross_sectionAAB <- na.omit(cross_sectionAAB)
+
+cross_sectionAAB$f_religion_2015 <- relevel(factor(cross_sectionAAB$religion_2015), ref=1) #Taking being catholic as reference
+cross_sectionAAB$f_emp_status <- relevel(factor(cross_sectionAAB$emp_status), ref=1) #Taking being full time employed as reference
+
+reg1 <- lm(s_lifegoal_help_r ~ age_divided + age2_divided, data= cross_sectionAAB)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(s_lifegoal_help_r ~ age_divided + age2_divided + female + pgbilzeit + netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAB)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(s_lifegoal_so_po_r ~ age_divided + age2_divided, data= cross_sectionAAB)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg4 <- lm(s_lifegoal_so_po_r ~ age_divided + age2_divided + female + pgbilzeit + netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAB)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+stargazer(reg1, reg2, reg3, reg4, type="html",
+          se=list(se_1, se_2, se_3, se_4),
+          covariate.labels= c("age/10", "age squared/100", "female","education in years" ,"net income/1000","health", "evangelical", "other christian", "islamic religious community", "other", "non-denominational","christian orthodox","shiite religious community","sunni religious community","alevi religious community","regular part-time", "vocational training", "other part-time", "unemployed", "sheltered workshop", "political attitude(0=completely left, 10=completely right"),
+          column.separate = c(2,2),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+
+Using household income
+```{r Table 12.2, results ='asis', message=FALSE, warning=FALSE}
+##Created by Zixin(19th Jan 2022)
+
+cross_sectionAAB <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2016,
+                         select= c("s_lifegoal_help_r","s_lifegoal_so_po_r", "age_divided", "age2_divided","female", "pgbilzeit", "hh_netincome_divided", "health", "emp_status", "religion_2015", "political_attitude_2014"))
+cross_sectionAAB <- na.omit(cross_sectionAAB)
+
+cross_sectionAAB$f_religion_2015 <- relevel(factor(cross_sectionAAB$religion_2015), ref=1) #Taking being catholic as reference
+cross_sectionAAB$f_emp_status <- relevel(factor(cross_sectionAAB$emp_status), ref=1) #Taking being full time employed as reference
+
+reg1 <- lm(s_lifegoal_help_r ~ age_divided + age2_divided, data= cross_sectionAAB)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(s_lifegoal_help_r ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAB)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+reg3 <- lm(s_lifegoal_so_po_r ~ age_divided + age2_divided, data= cross_sectionAAB)
+cov_3 <- vcovHC(reg3)
+se_3 <- sqrt(diag(cov_3))
+
+reg4 <- lm(s_lifegoal_so_po_r ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAB)
+cov_4 <- vcovHC(reg4)
+se_4 <- sqrt(diag(cov_4))
+
+stargazer(reg1, reg2, reg3, reg4, type="html",
+          se=list(se_1, se_2, se_3, se_4),
+          covariate.labels= c("age/10", "age squared/100", "female","education in years" ,"net income/1000","health", "evangelical", "other christian", "islamic religious community", "other", "non-denominational","christian orthodox","shiite religious community","sunni religious community","alevi religious community","regular part-time", "vocational training", "other part-time", "unemployed", "sheltered workshop", "political attitude(0=completely left, 10=completely right"),
+          column.separate = c(2,2),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+
+## Effect of Altruistic Capital: Regressions {.tabset}
+
+### Give Away 10,000 Euros 
+
+```{r Table 13, results ='asis', message=FALSE, warning=FALSE}
+##Created by Yashaswini (19th December 2021)
+
+cross_sectionAC <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2017,
+                         select= c("diff_giveaway_divided","money_capital2015", "volunteer_capital", "blood_capital2015", "age_divided", "age2_divided","female", "pgbilzeit", "netincome_divided", "health", "emp_status"))
+cross_sectionAC <- na.omit(cross_sectionAC)
+
+reg1 <- lm(diff_giveaway_divided ~ age_divided + age2_divided + money_capital2015 + volunteer_capital+ blood_capital2015, data= cross_sectionAC)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(diff_giveaway_divided ~ age_divided + age2_divided + money_capital2015 + volunteer_capital+ blood_capital2015 + female + pgbilzeit + netincome_divided + emp_status, data= cross_sectionAC)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+stargazer(reg1, reg2, type="html",
+          se=list(se_1, se_2),
+          column.labels = c("Giveaway 2017- Giveaway2010"),
+          covariate.labels= c("age/10", "age squared/100", "Money donated (2015)", "Volunteer work (2011, 2013, 2015)", "Blood donated (2015)", "Female" ,"Education in years", "Net income/1000", "Employment status"),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+
+### Life-goals: Being there for others 
+
+```{r Table 14, results ='asis', message=FALSE, warning=FALSE}
+##Created by Yashaswini (19th December 2021)
+
+cross_sectionAD <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2016,
+                         select= c("diff_lifegoal_help","money_capital2015", "volunteer_capital", "blood_capital2015", "age_divided", "age2_divided","female", "pgbilzeit", "netincome_divided", "health", "emp_status"))
+cross_sectionAD <- na.omit(cross_sectionAD)
+
+reg1 <- lm(diff_lifegoal_help ~ age_divided + age2_divided + money_capital2015 + volunteer_capital+ blood_capital2015, data= cross_sectionAD)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(diff_lifegoal_help ~ age_divided + age2_divided + money_capital2015 + volunteer_capital+ blood_capital2015 + female + pgbilzeit + netincome_divided + emp_status, data= cross_sectionAD)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+stargazer(reg1, reg2, type="html",
+          se=list(se_1, se_2),
+          column.labels = c("Beingthere2016 - Beingthere2008"),
+          covariate.labels= c("age/10", "age squared/100", "Money donated (2015)", "Volunteer work (2011, 2013, 2015)", "Blood donated (2015)", "Female" ,"Education in years", "Net income/1000", "Employment status"),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+### Life-goals: Being politically, socially active 
+
+```{r Table 15, results ='asis', message=FALSE, warning=FALSE}
+##Created by Yashaswini (19th December 2021)
+
+cross_sectionAE <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2016,
+                         select= c("diff_lifegoal_sopo","money_capital2015", "volunteer_capital", "blood_capital2015", "age_divided", "age2_divided","female", "pgbilzeit", "netincome_divided", "health", "emp_status"))
+cross_sectionAD <- na.omit(cross_sectionAE)
+
+reg1 <- lm(diff_lifegoal_sopo ~ age_divided + age2_divided + money_capital2015 + volunteer_capital+ blood_capital2015, data= cross_sectionAE)
+cov_1 <- vcovHC(reg1)
+se_1 <- sqrt(diag(cov_1))
+
+reg2 <- lm(diff_lifegoal_sopo ~ age_divided + age2_divided + money_capital2015 + volunteer_capital+ blood_capital2015 + female + pgbilzeit + netincome_divided + emp_status, data= cross_sectionAE)
+cov_2 <- vcovHC(reg2)
+se_2 <- sqrt(diag(cov_2))
+
+stargazer(reg1, reg2, type="html",
+          se=list(se_1, se_2),
+          column.labels = c("SociallyActive2016 - SociallyActive2008"),
+          covariate.labels= c("age/10", "age squared/100", "Money donated (2015)", "Volunteer work (2011, 2013, 2015)", "Blood donated (2015)", "Female" ,"Education in years", "Net income/1000", "Employment status"),
+          notes.align = "l",
+          notes = "Robust standard errors are in parentheses."
+        )
+
+```
+
+## Effect of Altruistic Capital: Figures {.tabset}
+
+### Give Away 10,000 Euros 
+
+```{r, warning=FALSE, message=FALSE}
+##Created by Yashaswini
+
+giveaway_cap_plot <- subset(dataSOEP_ageclean,
+                         select= c("age", "giveaway_2017", "giveaway_2010", "money_capital2015", "volunteer_capital2011", "volunteer_capital2013", "volunteer_capital2015", "blood_capital2015"))
+giveaway_cap_plot <- na.omit(giveaway_cap_plot)
+
+
+giveaway_cap_plot$age[giveaway_cap_plot$age >=85] <- 85
+giveaway_cap_plot$age[giveaway_cap_plot$age <=17] <- 17
+giveaway_cap_plot <- giveaway_cap_plot %>%
+                     group_by(money_capital2015, age) %>% 
+                     mutate(give2017_mean = mean(giveaway_2017),
+                            give2010_mean = mean(giveaway_2010))
+
+giveaway_cap_plot2 <- subset(giveaway_cap_plot, giveaway_cap_plot$money_capital2015==1)
+giveaway_cap_plot3 <- subset(giveaway_cap_plot, giveaway_cap_plot$money_capital2015==0)
+```
+
+```{r Plot 14, results='asis', warning=FALSE, message=FALSE}
+## Created by Yashaswini
+
+colors <- c("Donated 2010" = "brown2", "Donated 2017" = "brown4", "Not Donated 2010"= "darkslategray2", "Not Donated 2017"= "deepskyblue2")
+
+x <- ggplot() +
+  geom_point(data= giveaway_cap_plot2, aes(x=age, y=give2010_mean, color= "Donated 2010")) +
+  geom_point(data= giveaway_cap_plot2, aes(x=age, y=give2017_mean, color= "Donated 2017")) +
+  geom_point(data= giveaway_cap_plot3, aes(x=age, y=give2010_mean, color= "Not Donated 2010"))+
+  geom_point(data= giveaway_cap_plot3, aes(x=age, y=give2017_mean, color= "Not Donated 2017"))+
+  labs(x = "Age",
+       y = "Amount of 10,000 Euros to give away",
+       color = "") +
+  theme_bw()+
+  theme(legend.position = "bottom")+
+  scale_color_manual(values = colors) +
+  scale_x_discrete("Age", limits=c(20,25,30,35,40,45,50,55,60,65,70,75,80,85))
+
+x
+```
+
+## Descriptive Statisticss  {.tabset}
+-mean
+-sd
+-min
+-median
+-max
+
+### 2010
+-age
+-gender
+-education in year
+-health
+-net income
+-religion religion_2011
+-political attitude political_attitude_2009
+-employment status
+-giveaway
+-life goal 2008
+```{r}
+sample_stat2010 <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2010,
+                         select= c("money_donated","money_subscribe_amount", "blood_donated_10years", "age", "female", "pgbilzeit", "pglabnet", "hh_netincome", "health", "religion_2011","giveaway", "lifegoal_help_2008_r", "lifegoal_so_po_2008_r", "political_attitude_2009", "emp_status"))
+
+
+#Creating dummies for emp_status
+
+sample_stat2010$fulltime_emp <- rep(0, nrow(sample_stat2010))
+sample_stat2010$fulltime_emp[sample_stat2010$emp_status==1] <- 1 #Full time Employed(=1)
+sample_stat2010$no_emp <- rep(0, nrow(sample_stat2010))
+sample_stat2010$no_emp[sample_stat2010$emp_status==5] <- 1 #Unemployed(=1)
+
+#Creating dummies for religion
+sample_stat2010$christian <- rep(0, nrow(sample_stat2010))
+sample_stat2010$christian[sample_stat2010$religion_2011==1 | sample_stat2010$religion_2011==2 | sample_stat2010$religion_2011==3] <- 1 #Christian(=1)
+sample_stat2010$islamic <- rep(0, nrow(sample_stat2010))
+sample_stat2010$islamic[sample_stat2010$religion_2011==4] <- 1 #Islamic Religious Community (=1)
+sample_stat2010$confessionless <- rep(0, nrow(sample_stat2010))
+sample_stat2010$confessionless[sample_stat2010$religion_2011==6] <- 1 #Confessionless(=1)
+
+```
+
+
+```{r Table 16, results='asis', warning=FALSE, message=FALSE}
+stargazer(as.data.frame(sample_stat2010[c("age", "female", "pgbilzeit", "pglabnet","hh_netincome", "health", "fulltime_emp","no_emp", "political_attitude_2009", "christian","islamic" , "confessionless", "giveaway", "lifegoal_help_2008_r", "lifegoal_so_po_2008_r", "money_donated","money_subscribe_amount", "blood_donated_10years")]),omit.summary.stat = c("p25", "p75"), median= TRUE, type = "html", covariate.labels=c("Age", "Female (=1)", "Education in Year", "Net Income in Euros", "Household Net Income in Euros", "Current State of Health (1=Very Good,  5=Very Bad)","Full Time Employed (=1)", "Unemployed (=1)","Political Attitude (0=Completely Left, 10=Completely Right)", "Christian (=1)", "Islamic Religious Community (=1)", "Non-Denominational (=1)", "Amount to Give Away from 10.000 Euros", "To Be There for Others (1=Unimportant, 4=Very Important)", "To Be Socially And Politically Active (1=Unimportant, 4=Very Important)", "Subscribed Money (=1)", "Amount subscribed in Euros", "Blood donation in the last 10 years (=1)"), title="Summary statistics of 2010 Sample", align=TRUE, notes= "The table reports summary statistics( mean, standard deviation, median, minimum and maximum) of 2010 SOEP data. The political variables are taken from 2009, the life goal questions are from 2008 and the religion variables are from 2011 and SOEP data since relative questions of these variables were not included in 2010 questionnaire.", single.row = TRUE)
+```
+
+### 2017
+-age *
+-gender *
+-education in year *
+-health *
+-net income *
+-religion ---religion_2015
+-political attitude political_attitude_2014
+-employment status 
+-giveaway*
+-life goal 2016*
+```{r}
+sample_stat2017 <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2017,
+                         select= c("volunteer_work_r", "age", "female", "pgbilzeit", "pglabnet", "hh_netincome", "health", "religion_2015","giveaway", "lifegoal_help_2016_r", "lifegoal_so_po_2016_r", "political_attitude_2014", "emp_status"))
+
+#Creating dummies for emp_status
+
+sample_stat2017$fulltime_emp <- rep(0, nrow(sample_stat2017))
+sample_stat2017$fulltime_emp[sample_stat2017$emp_status==1] <- 1 #Full time Employed(=1)
+sample_stat2017$no_emp <- rep(0, nrow(sample_stat2017))
+sample_stat2017$no_emp[sample_stat2017$emp_status==5] <- 1 #Unemployed(=1)
+
+#Creating dummies for religion
+sample_stat2017$christian <- rep(0, nrow(sample_stat2017))
+sample_stat2017$christian[sample_stat2017$religion_2015==1 | sample_stat2017$religion_2015==2 | sample_stat2017$religion_2015==3] <- 1 #Christian(=1)
+sample_stat2017$islamic <- rep(0, nrow(sample_stat2017))
+sample_stat2017$islamic[sample_stat2017$religion_2015==4] <- 1 #Islamic Religious Community (=1)
+sample_stat2017$confessionless <- rep(0, nrow(sample_stat2017))
+sample_stat2017$confessionless[sample_stat2017$religion_2015==6] <- 1 #Confessionless(=1)
+
+```
+
+```{r Table 17, results='asis', warning=FALSE, message=FALSE}
+stargazer(as.data.frame(sample_stat2017[c("age", "female", "pgbilzeit", "pglabnet","hh_netincome", "health", "fulltime_emp","no_emp", "political_attitude_2014", "christian","islamic" , "confessionless", "giveaway", "lifegoal_help_2016_r", "lifegoal_so_po_2016_r", "volunteer_work_r")]),omit.summary.stat = c("p25", "p75"), median= TRUE, type = "html", covariate.labels=c("Age", "Female (=1)", "Education in Year", "Net Income in Euros", "Household Net Income in Euros", "Current State of Health (1=Very Good,  5=Very Bad)","Full Time Employed (=1)", "Unemployed (=1)","Political Attitude (0=Completely Left, 10=Completely Right)", "Christian (=1)", "Islamic Religious Community (=1)", "Non-Denominational (=1)", "Amount to Give Away from 10.000 Euros", "To Be There for Others(1=Unimportant, 4=Very Important)", "To Be Socially And Politically Active (1=Unimportant, 4=Very Important)", "Volunteer Work (1=Never, 4=Daily or Min 1x per Week)"), title="Summary statistics of 2017 Sample", align=TRUE, notes= "The table reports summary statistics( mean, standard deviation, median, minimum and maximum) of 2017 SOEP data. The political attitude variables are taken from 2014, the religion variables are taken from 2015 and life goal questions are from 2016 SOEP data since relative questions of these variables were not included in 2017 questionnaire.", single.row = TRUE)
+```
+
+## Scales with se clusterd by hh  {.tabset}
+
+### Give away in 2010
+
+```{r Table 18}
+cross_sectionAA_2_hh <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2010,
+                            select= c("giveaway_divided","s_giveaway_divided", "age_divided", "age2_divided","female", "pgbilzeit", "hh_netincome_divided", "health", "emp_status", "religion_2011", "political_attitude_2009","hid"))
+cross_sectionAA_2_hh <- na.omit(cross_sectionAA_2_hh)
+
+cross_sectionAA_2_hh$f_religion_2011 <- relevel(factor(cross_sectionAA_2_hh$religion_2011), ref=1) #Taking being catholic as reference
+cross_sectionAA_2_hh$f_emp_status <- relevel(factor(cross_sectionAA_2_hh$emp_status), ref=1) #Taking being full time employed as reference
+
+reg1 <- feols(giveaway_divided ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAA_2_hh, vcov = ~hid)
+reg2 <- feols(s_giveaway_divided ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAA_2_hh, vcov = ~hid)
+etable(reg1, reg2, cluster =  ~hid )
+
+```
+
+### Give away in 2017
+```{r Table 19}
+cross_sectionAAA_2_hh <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2017,
+                             select= c("hid", "giveaway_divided","s_giveaway_divided", "age_divided", "age2_divided","female", "pgbilzeit", "hh_netincome_divided", "health", "emp_status", "religion_2015", "political_attitude_2014"))
+cross_sectionAAA_2_hh <- na.omit(cross_sectionAAA_2_hh)
+
+cross_sectionAAA_2_hh$f_religion_2015 <- relevel(factor(cross_sectionAAA_2_hh$religion_2015), ref=1) #Taking being catholic as reference
+cross_sectionAAA_2_hh$f_emp_status <- relevel(factor(cross_sectionAAA_2_hh$emp_status), ref=1) #Taking being full time employed as reference
+reg1 <- feols(giveaway_divided ~  age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAA_2_hh, vcov = ~hid)
+reg2 <- feols(s_giveaway_divided ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAA_2_hh, vcov = ~hid)
+etable(reg1, reg2, cluster =  ~hid )
+```
+
+### Life goal in 2008
+```{r Table 20}
+cross_sectionAB_hh <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2008,
+                          select= c("s_lifegoal_help_r","s_lifegoal_so_po_r", "age_divided", "age2_divided","female", "pgbilzeit", "hh_netincome_divided", "health", "emp_status", "religion_2011", "political_attitude_2009", "hid"))
+cross_sectionAB_hh <- na.omit(cross_sectionAB_hh)
+
+cross_sectionAB_hh$f_religion_2011 <- relevel(factor(cross_sectionAB_hh$religion_2011), ref=1) #Taking being catholic as reference
+cross_sectionAB_hh$f_emp_status <- relevel(factor(cross_sectionAB_hh$emp_status), ref=1)
+reg1 <- feols(s_lifegoal_help_r ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAB_hh, vcov =  ~hid)
+reg2 <- feols(s_lifegoal_so_po_r ~ age_divided + age2_divided + female + pgbilzeit + hh_netincome_divided + health + f_religion_2011 + f_emp_status + political_attitude_2009, data= cross_sectionAB_hh, vcov =  ~hid)
+etable(reg1, reg2, cluster =  ~hid)
+```
+
+### Life goal in 2016
+```{r Table 21}
+cross_sectionAAB_hh <- subset(dataSOEP_ageclean, dataSOEP_ageclean$syear==2016,
+                           select= c("s_lifegoal_help_r","s_lifegoal_so_po_r", "age_divided", "age2_divided","female", "pgbilzeit", "netincome_divided", "health", "emp_status", "religion_2015", "political_attitude_2014", "hid"))
+cross_sectionAAB_hh <- na.omit(cross_sectionAAB_hh)
+cross_sectionAAB_hh$f_religion_2015 <- relevel(factor(cross_sectionAAB_hh$religion_2015), ref=1) #Taking being catholic as reference
+cross_sectionAAB_hh$f_emp_status <- relevel(factor(cross_sectionAAB_hh$emp_status), ref=1)
+reg1 <- feols(s_lifegoal_help_r ~ age_divided + age2_divided + female + pgbilzeit + netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAB_hh, vcov = ~hid)
+reg2 <- feols(s_lifegoal_so_po_r ~ age_divided + age2_divided + female + pgbilzeit + netincome_divided + health + f_religion_2015 + f_emp_status + political_attitude_2014, data= cross_sectionAAB_hh, vcov = ~hid)
+
+etable(reg1, reg2, cluster =  ~hid)
+
+```
